@@ -1,0 +1,75 @@
+name: Deploy Multiple Cloud Run Jobs
+
+on:
+  push:
+    branches:
+      - main  # or 'master', depending on your repo
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC authentication with GCP
+
+env:
+  PROJECT_ID: <YOUR_GCP_PROJECT_ID>
+  REGION: <YOUR_REGION>            # e.g. asia-south1, us-central1
+  REPO: <YOUR_ARTIFACT_REGISTRY>   # e.g. cloud-run-artifacts
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - folder: Event
+            image: event
+          - folder: FirstTouchEvent
+            image: first-touch-event
+          - folder: AppleStore
+            image: apple-store
+          - folder: Store
+            image: store
+          - folder: AdMob
+            image: admob
+          - folder: Adjust
+            image: adjust
+          - folder: GameDay
+            image: game-day
+          - folder: GameServer
+            image: game-server
+          - folder: BI_Game
+            image: bi-game
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/<POOL_NAME>/providers/<PROVIDER_NAME>
+          service_account: <GCP_SERVICE_ACCOUNT>@<PROJECT_ID>.iam.gserviceaccount.com
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ matrix.image }}:latest
+          echo "Building and pushing image: $IMAGE from folder: ${{ matrix.folder }}"
+          docker build -t $IMAGE ./${{ matrix.folder }}
+          docker push $IMAGE
+
+      - name: Deploy Cloud Run Job
+        run: |
+          IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ matrix.image }}:latest
+          gcloud run jobs deploy ${{ matrix.image }} \
+            --image=$IMAGE \
+            --region=${{ env.REGION }} \
+            --service-account=<CLOUD_RUN_SERVICE_ACCOUNT>@<PROJECT_ID>.iam.gserviceaccount.com \
+            --max-retries=1 \
+            --memory=2Gi \
+            --cpu=1 \
+            --task-timeout=1800s

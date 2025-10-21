@@ -45,7 +45,7 @@ SELECT DATE(TIMESTAMP_MICROS(event_timestamp), 'Asia/Riyadh') AS event_date,
        (SELECT value.string_value FROM UNNEST(event_params) WHERE key = "product_id") AS product_id,
        (SELECT value.string_value FROM UNNEST(event_params) WHERE key = "product_name") AS product_name,
        (SELECT value.string_value FROM UNNEST(event_params) WHERE key = "term") AS term,
-       FROM `whist-3ca02.analytics_232931779.events_*`
+       FROM `<GCP_PROJECT_ID>.analytics_232931779.events_*`
        WHERE   _TABLE_SUFFIX >= FORMAT_DATE('%Y%m%d', from_date)),
 
 event AS (SELECT *,
