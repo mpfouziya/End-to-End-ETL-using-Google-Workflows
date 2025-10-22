@@ -124,18 +124,36 @@ Navigation Menu → Workflows → Create Workflow
 Name it something like <ETL_WORKFLOW_NAME> (e.g., etl-runner-workflow).
 Set the schedule for the trigger.
 Write the workflow to run the cloud run jobs one after the other if the result of one job influence the next ETL.
-Workflow YAML definition:
+Example for Google Workflow YAML definition for Event & First Touch Event job:
 ```bash
 main:
   steps:
     - run_event:
-        call: http.post
-        args:
-          url: https://run.googleapis.com/v2/projects/<PROJECT_ID>/locations/<GCP_REGION>/jobs/event:run
-          auth:
-            type: OAuth2
-          body: {}
-        result: event_response
+        try:
+          call: http.post
+          args:
+            url: https://run.googleapis.com/v2/projects/<PROJECT_ID>/locations/<GCP_REGION>/jobs/event:run
+            auth:
+              type: OAuth2
+            body: {}
+          result: event_response
+        retry:
+          predicate: ${http.default_retry_predicate}
+          max_retries: 3
+          backoff:
+            initial_delay: 5
+            max_delay: 30
+            multiplier: 2
+        except:
+          as: e
+          steps:
+            - log_event_error:
+                call: sys.log
+                args:
+                  text: ${"Failed to start event job: " + e.message}
+                  severity: "ERROR"
+            - return_event_error:
+                return: ${"Workflow failed at event job step: " + e.message}
 
     - wait_event:
         call: wait_for_job
@@ -143,31 +161,59 @@ main:
           operation_name: ${event_response.body.name}
 
     - run_first_touch_event:
-        call: http.post
-        args:
-          url: https://run.googleapis.com/v2/projects/<GCP_PROJECT_ID>/locations/asia-south1/jobs/first-touch-event:run
-          auth:
-            type: OAuth2
-          body: {}
-        result: fte_response
+        try:
+          call: http.post
+          args:
+            url: https://run.googleapis.com/v2/projects/<PROJECT_ID>/locations/<GCP_REGION>/jobs/first-touch-event:run
+            auth:
+              type: OAuth2
+            body: {}
+          result: fte_response
+        retry:
+          predicate: ${http.default_retry_predicate}
+          max_retries: 3
+          backoff:
+            initial_delay: 5
+            max_delay: 30
+            multiplier: 2
+        except:
+          as: e
+          steps:
+            - log_fte_error:
+                call: sys.log
+                args:
+                  text: ${"Failed to start first-touch-event job: " + e.message}
+                  severity: "ERROR"
+            - return_fte_error:
+                return: ${"Workflow failed at first-touch-event job step: " + e.message}
 
     - wait_first_touch_event:
         call: wait_for_job
         args:
           operation_name: ${fte_response.body.name}
 
-
 # Helper subworkflow to wait for job completion
 wait_for_job:
   params: [operation_name]
   steps:
     - poll:
-        call: http.get
-        args:
-          url: ${"https://run.googleapis.com/v2/" + operation_name}
-          auth:
-            type: OAuth2
-        result: status
+        try:
+          call: http.get
+          args:
+            url: ${"https://run.googleapis.com/v2/" + operation_name}
+            auth:
+              type: OAuth2
+          result: status
+        except:
+          as: e
+          steps:
+            - log_poll_error:
+                call: sys.log
+                args:
+                  text: ${"Polling failed for " + operation_name + ": " + e.message}
+                  severity: "ERROR"
+            - return_poll_error:
+                return: ${"Polling failed: " + e.message}
 
     - check:
         switch:
@@ -181,6 +227,7 @@ wait_for_job:
 
     - repeat:
         next: poll
+
 
 ```
 This ensures your workflow triggers the Cloud Run job and waits until it finishes before continuing to any downstream steps (like sending notifications, updating BigQuery, or calling another service).
