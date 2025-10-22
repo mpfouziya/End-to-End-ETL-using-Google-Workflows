@@ -15,6 +15,18 @@ Deployment and authentication are handled through **GitHub Actions** and **Workl
 
 ---
 
+### 🔹 Data Sources and Integration Methods
+
+| Source | Integration Method | Description |
+|--------|--------------------|-------------|
+| **Google Analytics (GA4)** | GCP BigQuery Export / API | Transforms raw GA4 event data stored in GCP. |
+| **AdMob** | REST API with API Key | Fetches monetization and ad revenue metrics programmatically. |
+| **Adjust** | REST API with API Key | Retrieves mobile attribution and campaign performance data. |
+| **Apple App Store (App Store Connect)** | Authenticated using `.p8` files | Securely extracts app analytics and sales data using Apple’s authentication system. |
+| **Google Play Console** | GCP Native Data Transfer Service | Integrates daily Play Store data directly into BigQuery for further processing. |
+
+---
+
 ## 🧩 Architecture
 
 
