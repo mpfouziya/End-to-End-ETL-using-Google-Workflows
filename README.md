@@ -124,6 +124,7 @@ Navigation Menu → Workflows → Create Workflow
 Name it something like <ETL_WORKFLOW_NAME> (e.g., etl-runner-workflow).
 Set the schedule for the trigger.
 Write the workflow to run the cloud run jobs one after the other if the result of one job influence the next ETL.
+
 Example for Google Workflow YAML definition for Event & First Touch Event job:
 ```bash
 main:
